@@ -6,6 +6,7 @@ import {
   createNewBillingCycle,
   resetToSampleData,
   onStorageSync,
+  requestPersistentStorage,
 } from './services/storage';
 import { calculateBillingCycle } from './services/calculator';
 import { Navbar } from './components/layout/Navbar';
@@ -29,6 +30,13 @@ export const App: React.FC = () => {
   const [isNewCycleModalOpen, setIsNewCycleModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [activeChargesUnitId, setActiveChargesUnitId] = useState<string | null>(null);
+
+  // Request persistent non-evictable storage on initial mount (PWA / standalone / browser)
+  useEffect(() => {
+    requestPersistentStorage().catch((err) => {
+      console.warn('[Storage] Failed to request persistent storage on launch:', err);
+    });
+  }, []);
 
   // Subscribe to background IndexedDB data sync and restorations
   useEffect(() => {

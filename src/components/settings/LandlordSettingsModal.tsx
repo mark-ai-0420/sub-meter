@@ -12,12 +12,20 @@ import {
   MapPin,
   Sparkles,
   LayoutTemplate,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  HardDrive,
+  Info,
 } from 'lucide-react';
 import { AppData } from '../../types';
 import {
   exportDataAsJSON,
   importDataFromJSON,
   syncAppDataWithIndexedDB,
+  getStorageHealth,
+  requestPersistentStorage,
+  StorageHealthInfo,
 } from '../../services/storage';
 import { PresetTemplatesModal } from './PresetTemplatesModal';
 
@@ -49,6 +57,43 @@ export const LandlordSettingsModal: React.FC<LandlordSettingsModalProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced'>('idle');
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
+
+  const [storageHealth, setStorageHealth] = useState<StorageHealthInfo | null>(null);
+  const [isRequestingPersist, setIsRequestingPersist] = useState(false);
+  const [isRefreshingHealth, setIsRefreshingHealth] = useState(false);
+
+  const fetchStorageHealth = async () => {
+    try {
+      const health = await getStorageHealth();
+      setStorageHealth(health);
+    } catch (err) {
+      console.warn('[StorageHealth] Error querying storage health:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchStorageHealth();
+    }
+  }, [isOpen]);
+
+  const handleRequestPersistence = async () => {
+    try {
+      setIsRequestingPersist(true);
+      await requestPersistentStorage();
+      await fetchStorageHealth();
+    } catch (err) {
+      console.error('[StorageHealth] Request persistent storage failed:', err);
+    } finally {
+      setIsRequestingPersist(false);
+    }
+  };
+
+  const handleRefreshHealth = async () => {
+    setIsRefreshingHealth(true);
+    await fetchStorageHealth();
+    setIsRefreshingHealth(false);
+  };
 
   useEffect(() => {
     setPropertyName(appData.landlordInfo.propertyName || '');
@@ -278,22 +323,130 @@ export const LandlordSettingsModal: React.FC<LandlordSettingsModalProps> = ({
             </form>
 
             {/* Backup & Offline Storage Section */}
-            <div className="pt-4 border-t border-slate-200 space-y-3">
+            <div className="pt-4 border-t border-slate-200 space-y-4">
               <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-                <Download className="w-3.5 h-3.5 text-orange-500" />
-                2. Data Backup & Offline Synchronization
+                <Database className="w-3.5 h-3.5 text-orange-500" />
+                2. Data Management & Backup
               </h4>
 
               <p className="text-slate-500 text-[11px]">
                 Your data is stored in your browser's offline storage engine. You can export a JSON backup to transfer your setup to other devices or family members.
               </p>
 
-              <div className="flex flex-wrap gap-2">
+              {/* Storage Health & iOS Persistence Card */}
+              <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-3.5 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-600 flex items-center justify-center shrink-0">
+                      <Shield className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className="font-bold text-slate-900 text-xs leading-snug">Storage Health & iOS Persistence</h5>
+                      <span className="text-[10px] text-slate-500">Offline-first client quota management</span>
+                    </div>
+                  </div>
+
+                  {/* Status Badge */}
+                  <div>
+                    {storageHealth?.isPersisted ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>🛡️ Persistent Storage (Active)</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                        <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
+                        <span>⚠️ Standard / Evictable</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Storage Meter Progress Bar */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-medium text-slate-600">
+                    <span className="flex items-center gap-1.5">
+                      <HardDrive className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Quota Allocation</span>
+                    </span>
+                    <span className="font-mono text-slate-700 font-semibold">
+                      Used: {storageHealth ? `${storageHealth.usageFormatted} / ${storageHealth.quotaFormatted} (${storageHealth.percentageUsed}%)` : 'Estimating...'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        storageHealth?.isPersisted
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                          : 'bg-gradient-to-r from-amber-500 to-orange-500'
+                      }`}
+                      style={{
+                        width: `${Math.min(100, Math.max(storageHealth?.percentageUsed ? Math.max(storageHealth.percentageUsed, 1) : 0, 0))}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Explanation text */}
+                <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
+                  <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <p>
+                    PWAs on iOS can occasionally clear unvisited sites after 7-14 days unless persistent storage is active or installed to Home Screen.
+                  </p>
+                </div>
+
+                {/* Action button */}
+                <div className="pt-0.5">
+                  {!storageHealth?.isPersisted ? (
+                    <button
+                      type="button"
+                      onClick={handleRequestPersistence}
+                      disabled={isRequestingPersist}
+                      className="min-h-[44px] w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold rounded-xl shadow-sm transition active:scale-95 disabled:opacity-60 text-xs"
+                    >
+                      {isRequestingPersist ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Requesting Persistent Storage...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="w-4 h-4" />
+                          <span>🔒 Request Persistent Storage</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled
+                        className="min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold rounded-xl text-xs cursor-default"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                        <span>✓ Storage Guard Active</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRefreshHealth}
+                        disabled={isRefreshingHealth}
+                        className="min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-xl border border-slate-300 text-xs transition active:scale-95"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isRefreshingHealth ? 'animate-spin' : ''}`} />
+                        <span>Refresh Status</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Data Actions (Backup to IndexedDB, Export JSON Backup, Restore Backup File) */}
+              <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   type="button"
                   onClick={handleSyncDB}
                   disabled={syncStatus === 'syncing'}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition border border-slate-300 disabled:opacity-60 text-xs"
+                  className="min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition border border-slate-300 disabled:opacity-60 text-xs active:scale-95"
                 >
                   {syncStatus === 'syncing' ? (
                     <RefreshCw className="w-3.5 h-3.5 text-orange-500 animate-spin" />
@@ -307,20 +460,20 @@ export const LandlordSettingsModal: React.FC<LandlordSettingsModalProps> = ({
                       ? 'Syncing...'
                       : syncStatus === 'synced'
                       ? 'Synced to Offline DB!'
-                      : 'Sync Offline Storage'}
+                      : 'Backup to IndexedDB'}
                   </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleExportJSON}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition border border-slate-300 text-xs"
+                  className="min-h-[44px] inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition border border-slate-300 text-xs active:scale-95"
                 >
                   <Download className="w-3.5 h-3.5 text-orange-500" />
                   <span>Export JSON Backup</span>
                 </button>
 
-                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition border border-slate-300 text-xs">
+                <label className="min-h-[44px] cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition border border-slate-300 text-xs active:scale-95">
                   <Upload className="w-3.5 h-3.5 text-blue-500" />
                   <span>Restore Backup File</span>
                   <input

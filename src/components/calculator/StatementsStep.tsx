@@ -24,8 +24,11 @@ import {
   Search,
   Filter,
   CreditCard,
+  HardDrive,
+  CheckCircle2,
 } from 'lucide-react';
 import { generateMasterSummaryPdf, exportMasterSummaryCsv } from '../../services/pdfGenerator';
+import { exportDataAsJSON } from '../../services/storage';
 
 interface StatementsStepProps {
   cycle: BillingCycle;
@@ -60,6 +63,27 @@ export const StatementsStep: React.FC<StatementsStepProps> = ({
   const [activeShareTenant, setActiveShareTenant] = useState<TenantCalculationResult | null>(null);
   const [isGroupShareOpen, setIsGroupShareOpen] = useState(false);
   const [activePaymentUnitId, setActivePaymentUnitId] = useState<string | null>(null);
+  const [backupSuccess, setBackupSuccess] = useState(false);
+
+  // Quick 1-click JSON backup function to safeguard data offline
+  const handleQuickBackup = () => {
+    const jsonStr = exportDataAsJSON(appData);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const cycleMonth = (cycle as any).billingMonth || cycle.mainBill?.billingMonth;
+    const cycleNameClean = cycleMonth
+      ? cycleMonth.replace(/[^a-zA-Z0-9_-]/g, '_')
+      : cycle.name ? cycle.name.replace(/[^a-zA-Z0-9_-]/g, '_') : 'cycle';
+    a.download = `Meralco_Backup_${cycleNameClean}_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setBackupSuccess(true);
+    setTimeout(() => setBackupSuccess(false), 3000);
+  };
 
   // Initialize payments from cycle or local storage
   const [payments, setPayments] = useState<Record<string, TenantPayment>>(() => {
@@ -259,15 +283,39 @@ export const StatementsStep: React.FC<StatementsStepProps> = ({
           {/* Quick Actions */}
           <div className="flex flex-wrap items-center gap-2">
             <button
+              type="button"
+              onClick={handleQuickBackup}
+              className={`inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 text-xs font-bold rounded-xl transition border shadow-sm active:scale-95 ${
+                backupSuccess
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+              }`}
+              title="Download 1-click JSON backup of all cycle data and settings"
+            >
+              {backupSuccess ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                  <span>✓ Backup Downloaded</span>
+                </>
+              ) : (
+                <>
+                  <HardDrive className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Quick Backup JSON</span>
+                </>
+              )}
+            </button>
+            <button
+              type="button"
               onClick={() => setIsGroupShareOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition shadow-sm active:scale-95"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition shadow-sm active:scale-95"
             >
               <Share2 className="w-3.5 h-3.5 text-blue-400" />
               Copy Group Text
             </button>
             <button
+              type="button"
               onClick={() => exportMasterSummaryCsv(cycle, appData.landlordInfo)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition border border-slate-300 active:scale-95"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition border border-slate-300 active:scale-95"
             >
               <Download className="w-3.5 h-3.5 text-emerald-600" />
               Export CSV
@@ -418,12 +466,46 @@ export const StatementsStep: React.FC<StatementsStepProps> = ({
         />
       )}
 
+      {/* Bottom Safety & Offline Backup Advisory Banner */}
+      <div className="rounded-3xl bg-amber-50/90 border border-amber-200/90 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-amber-900 shadow-sm">
+        <div className="flex items-start sm:items-center gap-3">
+          <span className="text-2xl select-none" aria-hidden="true">💾</span>
+          <div>
+            <span className="font-bold text-amber-950">Safe Practice:</span>{' '}
+            <span className="text-amber-900">
+              Download a 1-click JSON backup after finalizing each monthly bill to guarantee zero data loss on iOS.
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleQuickBackup}
+          className={`inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 py-2.5 text-xs font-bold rounded-xl transition border shadow-sm active:scale-95 shrink-0 self-stretch sm:self-auto ${
+            backupSuccess
+              ? 'bg-emerald-600 text-white border-emerald-600'
+              : 'bg-amber-200/80 hover:bg-amber-300/80 text-amber-950 border-amber-300'
+          }`}
+        >
+          {backupSuccess ? (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-white" />
+              <span>✓ Backup Downloaded</span>
+            </>
+          ) : (
+            <>
+              <HardDrive className="w-4 h-4 text-amber-800" />
+              <span>Save JSON Backup</span>
+            </>
+          )}
+        </button>
+      </div>
+
       {/* Back Navigation Button */}
-      <div className="flex items-center justify-start pt-4">
+      <div className="flex items-center justify-start pt-2">
         <button
           type="button"
           onClick={onPrevStep}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-2xl shadow-sm transition active:scale-95"
+          className="inline-flex items-center gap-2 min-h-[44px] px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-2xl shadow-sm transition active:scale-95"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Meter Readings</span>

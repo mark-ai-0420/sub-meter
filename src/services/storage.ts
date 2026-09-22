@@ -386,3 +386,117 @@ export const resetToSampleData = (): AppData => {
   });
   return initialAppData;
 };
+
+export interface StorageHealthInfo {
+  isSupported: boolean;
+  isPersisted: boolean;
+  usageBytes: number;
+  quotaBytes: number;
+  usageFormatted: string;
+  quotaFormatted: string;
+  percentageUsed: number;
+}
+
+/**
+ * Formats bytes into a human-readable string (KB, MB, GB).
+ */
+export const formatStorageBytes = (bytes: number): string => {
+  if (!bytes || bytes <= 0 || !Number.isFinite(bytes)) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  if (i === 0) return `${bytes} B`;
+  const val = bytes / Math.pow(1024, i);
+  return `${val.toFixed(1)} ${units[i]}`;
+};
+
+/**
+ * Requests persistent, non-evictable storage from the browser.
+ * Checks if persistence is already active or requests it via navigator.storage.persist().
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.storage || !navigator.storage.persist) {
+    console.info('[Storage] Persistent storage granted: false');
+    return false;
+  }
+
+  try {
+    let isPersisted = false;
+    if (navigator.storage.persisted) {
+      isPersisted = await navigator.storage.persisted();
+    }
+    if (isPersisted) {
+      console.info('[Storage] Persistent storage granted: true');
+      return true;
+    }
+
+    const granted = await navigator.storage.persist();
+    console.info(`[Storage] Persistent storage granted: ${granted}`);
+    return granted;
+  } catch (err) {
+    console.warn('[Storage] Error requesting persistent storage:', err);
+    console.info('[Storage] Persistent storage granted: false');
+    return false;
+  }
+}
+
+/**
+ * Retrieves storage persistence status, usage, and quota estimates.
+ * Safely handles browser variations where storage estimation or persistence APIs are absent.
+ */
+export async function getStorageHealth(): Promise<StorageHealthInfo> {
+  const isSupported = typeof navigator !== 'undefined' && Boolean(navigator.storage);
+
+  if (!isSupported) {
+    return {
+      isSupported: false,
+      isPersisted: false,
+      usageBytes: 0,
+      quotaBytes: 0,
+      usageFormatted: '0 B',
+      quotaFormatted: 'Unknown',
+      percentageUsed: 0,
+    };
+  }
+
+  try {
+    const isPersisted = navigator.storage.persisted
+      ? await navigator.storage.persisted()
+      : false;
+
+    let usageBytes = 0;
+    let quotaBytes = 0;
+
+    if (navigator.storage.estimate) {
+      const estimate = await navigator.storage.estimate();
+      usageBytes = estimate.usage || 0;
+      quotaBytes = estimate.quota || 0;
+    }
+
+    const percentageUsed =
+      quotaBytes > 0
+        ? Math.min(100, Number(((usageBytes / quotaBytes) * 100).toFixed(2)))
+        : 0;
+
+    return {
+      isSupported: true,
+      isPersisted,
+      usageBytes,
+      quotaBytes,
+      usageFormatted: formatStorageBytes(usageBytes),
+      quotaFormatted: quotaBytes > 0 ? formatStorageBytes(quotaBytes) : 'Unknown',
+      percentageUsed,
+    };
+  } catch (err) {
+    console.warn('[Storage] Error querying storage health estimate:', err);
+    return {
+      isSupported: true,
+      isPersisted: false,
+      usageBytes: 0,
+      quotaBytes: 0,
+      usageFormatted: '0 B',
+      quotaFormatted: 'Unknown',
+      percentageUsed: 0,
+    };
+  }
+}
+
