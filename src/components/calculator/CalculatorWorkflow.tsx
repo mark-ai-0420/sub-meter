@@ -4,6 +4,7 @@ import {
   AppData,
   MainMeralcoBill,
 } from '../../types';
+import { findPrecedingBillingCycle } from '../../services/storage';
 import { StepProgress, WizardStep } from './StepProgress';
 import { MainBillStep } from './MainBillStep';
 import { MeterReadingsStep } from './MeterReadingsStep';
@@ -20,6 +21,7 @@ interface CalculatorWorkflowProps {
   onToggleOccupied: (unitId: string) => void;
   onAddMainLineUnit?: () => void;
   onUpdatePaymentRecord?: (unitId: string, payment: any) => void;
+  onSyncPreviousReadings?: (sourceCycleId: string) => void;
 }
 
 export const CalculatorWorkflow: React.FC<CalculatorWorkflowProps> = ({
@@ -33,6 +35,7 @@ export const CalculatorWorkflow: React.FC<CalculatorWorkflowProps> = ({
   onToggleOccupied,
   onAddMainLineUnit,
   onUpdatePaymentRecord,
+  onSyncPreviousReadings,
 }) => {
   const [currentStep, setCurrentStep] = useState<WizardStep>(1);
 
@@ -43,6 +46,12 @@ export const CalculatorWorkflow: React.FC<CalculatorWorkflowProps> = ({
 
   const hasMainLineUnit = appData.units.some((u) => u.isMainLine);
   const residualGapKwh = summary?.residualLossKwh || 0;
+
+  const precedingCycle = findPrecedingBillingCycle(
+    appData.billingCycles,
+    cycle.mainBill.billingMonth,
+    cycle.id
+  );
 
   return (
     <div className="space-y-6">
@@ -76,6 +85,8 @@ export const CalculatorWorkflow: React.FC<CalculatorWorkflowProps> = ({
           readings={cycle.readings}
           hasMainLineUnit={hasMainLineUnit}
           residualGapKwh={residualGapKwh}
+          precedingCycle={precedingCycle}
+          onSyncPreviousReadings={onSyncPreviousReadings}
           onAddMainLineUnit={onAddMainLineUnit}
           onUpdateReading={onUpdateReading}
           onOpenAdditionalCharges={onOpenAdditionalCharges}

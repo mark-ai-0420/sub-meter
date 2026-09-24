@@ -4,6 +4,7 @@ import {
   loadAppData,
   saveAppData,
   createNewBillingCycle,
+  syncCycleWithPreviousReadings,
   resetToSampleData,
   onStorageSync,
   requestPersistentStorage,
@@ -101,7 +102,8 @@ export const App: React.FC = () => {
     periodTo: string,
     dueDate: string,
     totalAmountDue: number,
-    totalMainKwh: number
+    totalMainKwh: number,
+    sourceCycleId?: string
   ) => {
     const { updatedData, newCycleId } = createNewBillingCycle(
       appData,
@@ -111,10 +113,17 @@ export const App: React.FC = () => {
       periodTo,
       dueDate,
       totalAmountDue,
-      totalMainKwh
+      totalMainKwh,
+      sourceCycleId
     );
     setAppData(updatedData);
     setActiveTab('calculator');
+  };
+
+  const handleSyncPreviousReadings = (sourceCycleId: string) => {
+    if (!activeCycle) return;
+    const updatedData = syncCycleWithPreviousReadings(appData, activeCycle.id, sourceCycleId);
+    setAppData(updatedData);
   };
 
   const handleDeleteCycle = (cycleId: string) => {
@@ -400,6 +409,7 @@ export const App: React.FC = () => {
             onToggleOccupied={handleToggleOccupied}
             onAddMainLineUnit={handleAddMainLineUnit}
             onUpdatePaymentRecord={handleUpdatePaymentRecord}
+            onSyncPreviousReadings={handleSyncPreviousReadings}
           />
         )}
 

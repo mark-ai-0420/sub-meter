@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   TenantCalculationResult,
   CommonAreaBreakdown,
   SubMeter,
+  BillingCycle,
 } from '../../types';
 import { formatPHP, formatKwh, formatNumber } from '../../utils/formatters';
 import {
@@ -17,6 +18,7 @@ import {
   Zap,
   Tag,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 
 interface MeterReadingsStepProps {
@@ -26,6 +28,8 @@ interface MeterReadingsStepProps {
   readings: Record<string, { previous: number; present: number }>;
   residualGapKwh?: number;
   hasMainLineUnit?: boolean;
+  precedingCycle?: BillingCycle;
+  onSyncPreviousReadings?: (sourceCycleId: string) => void;
   onAddMainLineUnit?: () => void;
   onUpdateReading: (meterId: string, field: 'previous' | 'present', value: number) => void;
   onOpenAdditionalCharges: (unitId: string) => void;
@@ -41,6 +45,8 @@ export const MeterReadingsStep: React.FC<MeterReadingsStepProps> = ({
   readings,
   residualGapKwh = 0,
   hasMainLineUnit = false,
+  precedingCycle,
+  onSyncPreviousReadings,
   onAddMainLineUnit,
   onUpdateReading,
   onOpenAdditionalCharges,
@@ -48,6 +54,24 @@ export const MeterReadingsStep: React.FC<MeterReadingsStepProps> = ({
   onPrevStep,
   onNextStep,
 }) => {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState(false);
+
+  const handleSyncClick = () => {
+    if (!precedingCycle || !onSyncPreviousReadings) return;
+    setIsSyncing(true);
+    try {
+      onSyncPreviousReadings(precedingCycle.id);
+      setSyncFeedback(true);
+      setTimeout(() => {
+        setSyncFeedback(false);
+      }, 4500);
+    } finally {
+      setTimeout(() => {
+        setIsSyncing(false);
+      }, 300);
+    }
+  };
   const commonMeters = meters.filter((m) => m.type === 'common');
 
   return (
@@ -79,6 +103,48 @@ export const MeterReadingsStep: React.FC<MeterReadingsStepProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Dial Continuity Sync Banner */}
+      {precedingCycle && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-amber-500/10 via-emerald-500/5 to-teal-500/10 border border-amber-300/80 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-800 flex items-center justify-center flex-shrink-0 font-bold border border-amber-300/80">
+              <RefreshCw className={`w-5 h-5 text-amber-700 ${isSyncing ? 'animate-spin' : ''}`} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <span>🔄 Dial Continuity Sync</span>
+                </h4>
+                <span className="text-[11px] font-semibold px-2.5 py-0.5 bg-amber-100/80 text-amber-900 rounded-full border border-amber-200">
+                  Source: {precedingCycle.name}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
+                Your previous dials were initialized from <strong className="font-semibold text-slate-800">{precedingCycle.name}</strong>. If you recently updated dials in that month, click to sync:
+              </p>
+              {syncFeedback && (
+                <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-300 animate-in fade-in zoom-in-95 duration-200">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                  <span>✓ Previous dials synced! Present entries preserved.</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-3 w-full md:w-auto justify-end flex-shrink-0">
+            <button
+              type="button"
+              onClick={handleSyncClick}
+              disabled={isSyncing}
+              aria-label={`Sync Previous Dials from ${precedingCycle.name}`}
+              className="min-h-[44px] w-full md:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-extrabold text-xs rounded-2xl shadow-md shadow-amber-500/20 transition-all active:scale-95 cursor-pointer whitespace-nowrap disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>🔄 Sync Previous Dials from {precedingCycle.name}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Line Remainder Callout (If user has 4 units but only 3 are configured) */}
       {!hasMainLineUnit && residualGapKwh > 0.1 && (

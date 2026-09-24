@@ -252,6 +252,63 @@ export const restoreFromIndexedDB = async (): Promise<AppData | null> => {
   return null;
 };
 
+export const findPrecedingBillingCycle = (
+  cycles: BillingCycle[],
+  targetBillingMonth?: string,
+  currentCycleId?: string
+): BillingCycle | undefined => {
+  if (!cycles || cycles.length === 0) return undefined;
+
+  // Helper to normalize month string (e.g., '2026-08-15' -> '2026-08')
+  const normalizeMonth = (val?: string): string => {
+    if (!val) return '';
+    const trimmed = val.trim();
+    if (/^\d{4}-\d{2}/.test(trimmed)) {
+      return trimmed.slice(0, 7);
+    }
+    return trimmed;
+  };
+
+  // Sort cycles chronologically descending (newest to oldest)
+  const sorted = [...cycles].sort((a, b) => {
+    const monthA = normalizeMonth(a.mainBill?.billingMonth || a.mainBill?.periodTo);
+    const monthB = normalizeMonth(b.mainBill?.billingMonth || b.mainBill?.periodTo);
+    if (monthA && monthB && monthA !== monthB) {
+      return monthB.localeCompare(monthA);
+    }
+    if (monthA && !monthB) return -1;
+    if (!monthA && monthB) return 1;
+
+    const toA = a.mainBill?.periodTo || '';
+    const toB = b.mainBill?.periodTo || '';
+    if (toA && toB && toA !== toB) {
+      return toB.localeCompare(toA);
+    }
+    if (toA && !toB) return -1;
+    if (!toA && toB) return 1;
+
+    const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return createdB - createdA;
+  });
+
+  const normalizedTarget = normalizeMonth(targetBillingMonth);
+
+  // If targetBillingMonth is provided: find the latest cycle whose billingMonth is strictly before targetBillingMonth (ignoring currentCycleId if provided).
+  if (normalizedTarget) {
+    const preceding = sorted.find((c) => {
+      const cMonth = normalizeMonth(c.mainBill?.billingMonth || c.mainBill?.periodTo);
+      return Boolean(cMonth && cMonth < normalizedTarget);
+    });
+    if (preceding) {
+      return preceding;
+    }
+  }
+
+  // If no preceding cycle is found by month (or no targetBillingMonth provided): find the chronologically latest cycle that is not currentCycleId.
+  return sorted.find((c) => !currentCycleId || c.id !== currentCycleId);
+};
+
 export const createNewBillingCycle = (
   appData: AppData,
   cycleName: string,
@@ -260,23 +317,44 @@ export const createNewBillingCycle = (
   periodTo: string,
   dueDate: string,
   totalAmountDue: number = 0,
-  totalMainKwh: number = 0
+  totalMainKwh: number = 0,
+  sourceCycleId?: string
 ): { updatedData: AppData; newCycleId: string } => {
   const newCycleId = `cycle-${Date.now()}`;
 
-  // Find latest cycle to rollover readings
-  const sortedCycles = [...appData.billingCycles].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
-  const latestCycle = sortedCycles[0];
+  // Determine sourceCycle
+  let sourceCycle: BillingCycle | undefined;
+  if (sourceCycleId === 'none') {
+    sourceCycle = undefined;
+  } else if (sourceCycleId) {
+    sourceCycle = appData.billingCycles.find((c) => c.id === sourceCycleId);
+    if (!sourceCycle) {
+      sourceCycle = findPrecedingBillingCycle(
+        appData.billingCycles,
+        billingMonth,
+        appData.activeCycleId || undefined
+      );
+    }
+  } else {
+    sourceCycle = findPrecedingBillingCycle(
+      appData.billingCycles,
+      billingMonth,
+      appData.activeCycleId || undefined
+    );
+  }
 
   const initialReadings: Record<string, { previous: number; present: number }> = {};
 
   appData.meters.forEach((meter) => {
     let prevReading = meter.initialReading || 0;
-    if (latestCycle && latestCycle.readings[meter.id]) {
-      // The new previous reading is the last cycle's present reading!
-      prevReading = latestCycle.readings[meter.id].present ?? prevReading;
+    if (sourceCycle && sourceCycle.readings && sourceCycle.readings[meter.id]) {
+      const sReading = sourceCycle.readings[meter.id];
+      // The new previous reading MUST be the source cycle's present reading!
+      if (typeof sReading.present === 'number' && sReading.present > 0) {
+        prevReading = sReading.present;
+      } else if (typeof sReading.previous === 'number') {
+        prevReading = sReading.previous;
+      }
     }
     initialReadings[meter.id] = {
       previous: prevReading,
@@ -287,9 +365,9 @@ export const createNewBillingCycle = (
   // Preserve recurring default charges (like garbage fee) if desired, or start fresh
   const defaultAdditionalCharges: Record<string, AdditionalChargeItem[]> = {};
   appData.units.forEach((unit) => {
-    if (latestCycle && latestCycle.additionalCharges[unit.id]) {
+    if (sourceCycle && sourceCycle.additionalCharges && sourceCycle.additionalCharges[unit.id]) {
       // Clone recurring charges without water meter reading which will be new
-      const recurring = latestCycle.additionalCharges[unit.id].map((c) => ({
+      const recurring = sourceCycle.additionalCharges[unit.id].map((c) => ({
         ...c,
         id: `charge-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       }));
@@ -299,14 +377,15 @@ export const createNewBillingCycle = (
     }
   });
 
-  // Rollover water readings if present in previous cycle
+  // Rollover water readings if present in source cycle
   const initialWaterReadings: Record<string, WaterReadingRecord> = {};
   appData.units.forEach((unit) => {
-    if (latestCycle && latestCycle.waterReadings && latestCycle.waterReadings[unit.id]) {
-      const prevWater = latestCycle.waterReadings[unit.id];
+    if (sourceCycle && sourceCycle.waterReadings && sourceCycle.waterReadings[unit.id]) {
+      const prevWater = sourceCycle.waterReadings[unit.id];
+      const prevWaterVal = prevWater.present || prevWater.previous || 0;
       initialWaterReadings[unit.id] = {
-        previous: prevWater.present || 0,
-        present: prevWater.present || 0,
+        previous: prevWaterVal,
+        present: prevWaterVal,
         ratePerCuM: prevWater.ratePerCuM || 0,
         amount: 0,
       };
@@ -328,7 +407,7 @@ export const createNewBillingCycle = (
     },
     readings: initialReadings,
     additionalCharges: defaultAdditionalCharges,
-    commonAreaAllocMethod: latestCycle ? latestCycle.commonAreaAllocMethod : 'equal',
+    commonAreaAllocMethod: sourceCycle ? sourceCycle.commonAreaAllocMethod : 'equal',
     payments: {},
     waterReadings: initialWaterReadings,
   };
@@ -351,6 +430,110 @@ export const createNewBillingCycle = (
 
   saveAppData(updatedData);
   return { updatedData, newCycleId };
+};
+
+export const syncCycleWithPreviousReadings = (
+  appData: AppData,
+  targetCycleId: string,
+  sourceCycleId: string
+): AppData => {
+  const targetCycle = appData.billingCycles.find((c) => c.id === targetCycleId);
+  const sourceCycle = appData.billingCycles.find((c) => c.id === sourceCycleId);
+
+  if (!targetCycle || !sourceCycle) {
+    console.warn(
+      `[Storage] syncCycleWithPreviousReadings: target (${targetCycleId}) or source (${sourceCycleId}) cycle not found.`
+    );
+    return appData;
+  }
+
+  // Non-destructive sync for electric meter readings
+  const updatedReadings: Record<string, { previous: number; present: number }> = {
+    ...(targetCycle.readings || {}),
+  };
+
+  appData.meters.forEach((meter) => {
+    if (sourceCycle.readings && sourceCycle.readings[meter.id]) {
+      const sReading = sourceCycle.readings[meter.id];
+      const prevVal =
+        typeof sReading.present === 'number' && sReading.present > 0
+          ? sReading.present
+          : typeof sReading.previous === 'number'
+          ? sReading.previous
+          : meter.initialReading || 0;
+
+      const currentReading = updatedReadings[meter.id] || {
+        previous: prevVal,
+        present: prevVal,
+      };
+
+      updatedReadings[meter.id] = {
+        ...currentReading,
+        previous: prevVal,
+        // DO NOT touch targetCycle.readings[meter.id].present! Preserve entered dials
+      };
+    }
+  });
+
+  // Non-destructive sync for water readings
+  const updatedWaterReadings: Record<string, WaterReadingRecord> = {
+    ...(targetCycle.waterReadings || {}),
+  };
+
+  if (sourceCycle.waterReadings) {
+    appData.units.forEach((unit) => {
+      if (sourceCycle.waterReadings?.[unit.id]) {
+        const sWater = sourceCycle.waterReadings[unit.id];
+        const prevWaterVal = sWater.present || sWater.previous || 0;
+
+        const currentWater = updatedWaterReadings[unit.id] || {
+          previous: prevWaterVal,
+          present: prevWaterVal,
+          ratePerCuM: sWater.ratePerCuM || 0,
+          amount: 0,
+        };
+
+        const ratePerCuM = currentWater.ratePerCuM || sWater.ratePerCuM || 0;
+        const presentCuM = currentWater.present || 0;
+        const cuMConsumed = Math.max(0, presentCuM - prevWaterVal);
+
+        updatedWaterReadings[unit.id] = {
+          ...currentWater,
+          previous: prevWaterVal,
+          amount: Math.round(cuMConsumed * ratePerCuM * 100) / 100,
+          // DO NOT touch currentWater.present! Preserve entered dials
+        };
+      }
+    });
+  }
+
+  const updatedTargetCycle: BillingCycle = {
+    ...targetCycle,
+    readings: updatedReadings,
+    waterReadings: updatedWaterReadings,
+  };
+
+  // Re-compute calculation
+  updatedTargetCycle.calculationSummary = calculateBillingCycle({
+    units: appData.units,
+    meters: appData.meters,
+    mainBill: updatedTargetCycle.mainBill,
+    readings: updatedTargetCycle.readings,
+    additionalCharges: updatedTargetCycle.additionalCharges,
+    commonAreaAllocMethod: updatedTargetCycle.commonAreaAllocMethod,
+  });
+
+  const updatedCycles = appData.billingCycles.map((c) =>
+    c.id === targetCycleId ? updatedTargetCycle : c
+  );
+
+  const updatedData: AppData = {
+    ...appData,
+    billingCycles: updatedCycles,
+  };
+
+  saveAppData(updatedData);
+  return updatedData;
 };
 
 export const exportDataAsJSON = (appData: AppData): string => {
