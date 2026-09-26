@@ -71,7 +71,7 @@ export const MainBillStep: React.FC<MainBillStepProps> = ({
         <button
           type="button"
           onClick={() => setShowTips(!showTips)}
-          className="text-xs text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm transition flex items-center gap-1.5 font-medium"
+          className="min-h-[44px] text-xs text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 shadow-sm transition flex items-center gap-2 font-medium active:scale-95"
         >
           <HelpCircle className="w-4 h-4 text-orange-500" />
           <span>{showTips ? 'Hide Meralco SOA Guide' : 'How to read your bill?'}</span>
@@ -197,7 +197,7 @@ export const MainBillStep: React.FC<MainBillStepProps> = ({
               type="date"
               value={mainBill.periodFrom || ''}
               onChange={(e) => onChangeMainBill({ periodFrom: e.target.value })}
-              className="w-full px-3.5 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
+              className="w-full min-h-[44px] px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
             />
           </div>
 
@@ -209,7 +209,7 @@ export const MainBillStep: React.FC<MainBillStepProps> = ({
               type="date"
               value={mainBill.periodTo || ''}
               onChange={(e) => onChangeMainBill({ periodTo: e.target.value })}
-              className="w-full px-3.5 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
+              className="w-full min-h-[44px] px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
             />
           </div>
 
@@ -221,7 +221,7 @@ export const MainBillStep: React.FC<MainBillStepProps> = ({
               type="date"
               value={mainBill.dueDate || ''}
               onChange={(e) => onChangeMainBill({ dueDate: e.target.value })}
-              className="w-full px-3.5 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
+              className="w-full min-h-[44px] px-3.5 py-2.5 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
             />
           </div>
         </div>

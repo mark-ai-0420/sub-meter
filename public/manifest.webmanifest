@@ -1,0 +1,34 @@
+{
+  "name": "Meralco Sub-Meter Calculator & Billing Allocation",
+  "short_name": "Sub-Meter Pro",
+  "description": "Sub-meter electricity billing calculator for apartment buildings with proportional allocation of generation charges, taxes, common areas, and line losses.",
+  "theme_color": "#0B192C",
+  "background_color": "#F8FAFC",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/maskable-icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -86,7 +86,7 @@ export const InstallPromptBanner: React.FC<InstallPromptBannerProps> = ({
             <button
               onClick={handleInstallClick}
               disabled={isInstalling}
-              className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md shadow-orange-500/25 transition disabled:opacity-50"
+              className="flex-1 md:flex-initial min-h-[44px] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 active:scale-95 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md shadow-orange-500/25 transition disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
               <span>{isIOS ? 'How to Install on iOS' : isInstalling ? 'Installing...' : 'Install App'}</span>
@@ -95,7 +95,7 @@ export const InstallPromptBanner: React.FC<InstallPromptBannerProps> = ({
             <button
               onClick={handleDismiss}
               aria-label="Dismiss banner"
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition shrink-0"
+              className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center p-2.5 text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition shrink-0"
             >
               <X className="w-4 h-4" />
             </button>

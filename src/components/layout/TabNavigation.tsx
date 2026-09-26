@@ -43,9 +43,9 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
   ];
 
   return (
-    <div className="bg-white border-b border-slate-200/80 sticky top-16 z-20 shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <nav className="flex space-x-2 sm:space-x-6 overflow-x-auto py-2.5 no-scrollbar" aria-label="Tabs">
+    <div className="bg-white border-b border-slate-200/80 sticky top-16 z-20 shadow-sm w-full overflow-hidden">
+      <div className="max-w-6xl mx-auto w-full min-w-0 px-2 sm:px-6 lg:px-8">
+        <nav className="flex space-x-2 sm:space-x-4 overflow-x-auto py-2 no-scrollbar scroll-smooth w-full min-w-0" aria-label="Tabs">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -54,7 +54,7 @@ export const TabNavigation: React.FC<TabNavigationProps> = ({
               <button
                 key={tab.id}
                 onClick={() => onChangeTab(tab.id)}
-                className={`flex items-center gap-2.5 px-4 py-2 text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap transition-all ${
+                className={`min-h-[44px] inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded-xl whitespace-nowrap active:scale-95 transition-all ${
                   isActive
                     ? 'bg-orange-50 text-orange-600 shadow-sm ring-1 ring-orange-500/20'
                     : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/70'

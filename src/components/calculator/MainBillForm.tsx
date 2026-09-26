@@ -38,7 +38,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6 transition-all hover:shadow-md">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-6 transition-all hover:shadow-md w-full max-w-full">
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-5 py-4 text-white flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center space-x-3">
@@ -59,9 +59,9 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
           <button
             type="button"
             onClick={() => setShowTips(!showTips)}
-            className="text-xs text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded-md transition flex items-center gap-1 border border-slate-700"
+            className="min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 text-xs rounded-xl text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 transition active:scale-95"
           >
-            <Info className="w-3.5 h-3.5 text-orange-400" />
+            <Info className="w-3.5 h-3.5 text-orange-400 shrink-0" />
             <span>{showTips ? 'Hide Tips' : 'Where to find these numbers?'}</span>
           </button>
         </div>
@@ -97,7 +97,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
             value={cycleName}
             onChange={(e) => onChangeCycleName(e.target.value)}
             placeholder="e.g. August 2026 Billing"
-            className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+            className="w-full min-h-[44px] px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
           />
         </div>
 
@@ -115,7 +115,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
               value={mainBill.totalAmountDue || ''}
               onChange={(e) => onChangeMainBill({ totalAmountDue: parseFloat(e.target.value) || 0 })}
               placeholder="0.00"
-              className="w-full pl-8 pr-3.5 py-2 text-sm font-semibold bg-white text-slate-900 border border-orange-300/80 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition"
+              className="w-full min-h-[44px] pl-8 pr-3.5 py-2.5 text-sm font-semibold bg-white text-slate-900 border border-orange-300/80 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition"
             />
           </div>
         </div>
@@ -133,7 +133,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
               value={mainBill.totalMainKwh || ''}
               onChange={(e) => onChangeMainBill({ totalMainKwh: parseFloat(e.target.value) || 0 })}
               placeholder="0.0"
-              className="w-full pl-3.5 pr-14 py-2 text-sm font-semibold bg-white text-slate-900 border border-orange-300/80 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition"
+              className="w-full min-h-[44px] pl-3.5 pr-14 py-2.5 text-sm font-semibold bg-white text-slate-900 border border-orange-300/80 rounded-xl focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition"
             />
             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-500">kWh</span>
           </div>
@@ -165,7 +165,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
             type="date"
             value={mainBill.periodFrom || ''}
             onChange={(e) => onChangeMainBill({ periodFrom: e.target.value })}
-            className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
+            className="w-full min-h-[44px] px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
           />
         </div>
 
@@ -178,7 +178,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
             type="date"
             value={mainBill.periodTo || ''}
             onChange={(e) => onChangeMainBill({ periodTo: e.target.value })}
-            className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
+            className="w-full min-h-[44px] px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
           />
         </div>
 
@@ -191,7 +191,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
             type="date"
             value={mainBill.dueDate || ''}
             onChange={(e) => onChangeMainBill({ dueDate: e.target.value })}
-            className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
+            className="w-full min-h-[44px] px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
           />
         </div>
 
@@ -203,7 +203,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
           <select
             value={commonAreaAllocMethod}
             onChange={(e) => onChangeAllocMethod(e.target.value as 'equal' | 'proportional')}
-            className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 transition"
+            className="w-full min-h-[44px] px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:bg-white focus:ring-2 focus:ring-orange-500 transition cursor-pointer"
           >
             <option value="equal">Split Equally among active tenants</option>
             <option value="proportional">Proportional to tenant usage</option>
@@ -226,7 +226,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="cursor-pointer px-2.5 py-1 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-slate-700 font-medium transition shadow-sm">
+          <label className="cursor-pointer min-h-[44px] inline-flex items-center px-3 py-2 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-slate-700 font-medium transition shadow-sm">
             <span>{mainBill.billPhotoUrl ? 'Replace Bill Photo' : 'Upload Bill Photo'}</span>
             <input
               type="file"
@@ -239,7 +239,7 @@ export const MainBillForm: React.FC<MainBillFormProps> = ({
             <button
               type="button"
               onClick={() => onChangeMainBill({ billPhotoUrl: undefined })}
-              className="text-red-600 hover:text-red-700 underline text-xs"
+              className="min-h-[44px] inline-flex items-center text-red-600 hover:text-red-700 underline text-xs px-2"
             >
               Remove
             </button>
