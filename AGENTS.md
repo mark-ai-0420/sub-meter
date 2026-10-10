@@ -1,91 +1,25 @@
-# AGENTS.md — Development Guidelines & Collaboration Protocol
+# AGENTS.md — Meralco Sub-Meter Pro
 
-Welcome to **Meralco Sub-Meter Pro**. This document defines the operational protocol, architectural standards, and workflow rules for AI agents and subagents working in this codebase.
+Shared development instructions for Antigravity 2.0 and Codex CLI.
 
----
+## Project and commands
+React 19, TypeScript, Vite 8, Tailwind CSS 3, IndexedDB/idb and PDF exports; package-lock.json.
 
-## 🤝 1. Collaboration & User Pairing Philosophy
+- Development: `npm run dev`.
+- Verification: `npm run lint`, `npm run build`. Run affected checks before reporting implementation complete.
+- Use installed dependencies and the current lockfile; do not upgrade tools just to follow an example.
 
-1. **5-Node Multi-Agent Lifecycle Protocol (MANDATORY)**:
-   ```mermaid
-   graph TD
-       A["1. 🎯 Product Strategist"] -->|Feature Scope & Requirements| B["2. 🎨 UI/UX Designer"]
-       B -->|Clarify / Iterate if Blocked| A
-       B -->|Approved Design Spec & Handoff| C["3. ⚡ Engineering Hub"]
-       C -->|Parallel Builders with File-Lock| C_Test["Verified Build & Visual Proof"]
-       C_Test -->|Schema changes?| DBA_Check{"Migration files changed?"}
-       DBA_Check -->|YES: Full Audit| D["4. 🗄️ DBA & Cloud Architect"]
-       DBA_Check -->|NO: Awareness-only| UserGate["Prompt User for Git Approval"]
-       C_Test -->|Screenshots & Walkthrough| E["5. 📢 Poster / Community Lead"]
-       D -->|RLS, Indexes & Security Sign-Off| UserGate
-       UserGate -->|User Confirms| GitPush["Git Commit & Push to Main"]
-       GitPush -->|Release Broadcast| E_Live["Poster Publishes"]
-       E_Live -->|User & Engagement Insights| A
-   ```
+## Project invariants
+- Preserve offline-first storage, existing records and export/import compatibility. Never clear local data to repair an unrelated issue.
+- Verify readings, units, rate assumptions, allocation totals and monetary rounding before changing billing logic. Test zero usage, invalid readings and partial periods where applicable.
+- Verify PDF statements, totals and pagination when reports change. Use synthetic account data in screenshots.
+- Read `MULTI_AGENT_SOP.md` for role context. This AGENTS.md and `.agents/rules/` define the current workflow and approval controls if older SOP prose conflicts.
+- Read `.agents/rules/tdd-workflow.md`, `git-approval-gate.md` and `db-migration-gate.md` for applicable work. Scope substantial features through product brief, design specification, implementation plan, verification, and conditional database review; focused fixes use a short plan.
 
-   - **Node 1 (Product -> UX)**: Product Strategist authors `handoffs/<feature>/01_product_brief.md` defining problem statement, requirements, and acceptance criteria.
-   - **Node 2 (UX -> Engineering)**: UI/UX Designer authors `handoffs/<feature>/02_design_spec.md` with responsive layouts, visual tokens, interaction states, and file-lock assignments.
-   - **Node 3 (Engineering Hub Execution & Engine Choice)**: Lead Architect (3A) authors `03_implementation_plan.md` and selects the optimal execution engine:
-     - **Engine 1: Parallel Builder Fan-Out with File-Locking (Default)**: For iterative features, UI/UX polish, and targeted code changes. Spawns 2–6 Flash-tier builders with disjoint file locks.
-     - **Engine 2: `/teamwork-preview` Swarm Engine**: For massive greenfield systems, standalone microservices, or complex parallel exploration requiring a 10+ agent swarm.
-     - In both cases, **3C Independent QA Critic** executes unified build checks (`npm run build`), runs automated E2E browser tests, and verifies screenshots before proceeding.
-   - **Node 4 (Conditional DBA Gate)**: If database migrations or schema files changed (`supabase/migrations`, `prisma/schema.prisma`, `drizzle/`, etc.), DBA review and security sign-off is mandatory and blocking. If UI/logic only, DBA is notified for awareness (non-blocking).
-   - **Node 5 (Git Gate)**: Engineering Hub prompts the user for explicit Git commit/push confirmation.
-   - **Node 6 (Release Broadcast)**: Once pushed to `main`, Poster finalizes and publishes community/social media release announcements (`06_release_post.md`).
-   - **Node 7 (Retrospective Feedback Loop)**: Poster and telemetry feed engagement insights back to Node 1 for subsequent feature iterations.
-
-2. **Explicit User Approval for Git (MANDATORY)**:
-   - **NEVER** run `git commit` or `git push` automatically or silently.
-   - For **schema-touching releases**: wait for DBA audit sign-off, verify build, present screenshots, then ask user for explicit confirmation.
-   - For **UI/code-only releases**: verify build, present screenshots, then ask user for explicit confirmation.
-   - Format approved commits using **Conventional Commits** (e.g. `feat(auth): add session recovery and password visibility toggles`).
-
-3. **Subagent Fan-Out with File-Lock Protocol**:
-   - Decompose multi-file features across dedicated builder subagents (`Model: 'flash'`).
-   - **Each builder must have explicit file-level ownership.** No two builders may modify the same file concurrently.
-   - Each subagent verifies its changes independently before reporting completion.
-   - Primary thread acts as the Orchestrator and QA Critic.
-
-4. **High-Signal Verification Artifacts**:
-   - Present verification via concise markdown with clickable file links (e.g. [`src/main.tsx`](file:///path/to/file)).
-   - Include structured **Pass/Fail test tables** and **high-resolution screenshot carousels**.
-
-5. **Proactive Root-Cause Resolution**:
-   - Diagnose root causes directly instead of asking the user to troubleshoot.
-   - When encountering high-impact architectural trade-offs, proactively propose the cleanest solution with rationale or suggest `/grill-me`.
-
----
-
-## 🏗️ 2. Tech Stack & Architectural Conventions
-
-* **Framework**: Vite React 19 + TypeScript + PWA
-* **Styling**: Tailwind CSS v3/v4 & Lucide React icons
-* **Database & Offline Engine**: Dual-Tier Offline-First Storage (IndexedDB via `idb` + LocalStorage)
-* **Reports & Utilities**: jsPDF + autoTable (PDF billing statements & master summaries)
-* **Build & QA**: `npm run build` (0 errors required) + Automated Puppeteer E2E screenshot testing
-
-### Critical Rules:
-- **Server vs Client Boundaries**: Isolate database access and secret keys inside server functions or backend endpoints.
-- **Defensive Data Handling**: Always guard against nullable loader/server data to prevent hydration crashes.
-- **Zero Build Regressions**: `npm run build` must succeed with 0 compilation, type, and lint errors.
-
----
-
-## 🔄 3. Mandatory Rules & Gates
-
-Refer to project-specific rules in `.agents/rules/`:
-- [`.agents/rules/tdd-workflow.md`](.agents/rules/tdd-workflow.md) — Subagent fan-out, TDD execution, and visual verification
-- [`.agents/rules/git-approval-gate.md`](.agents/rules/git-approval-gate.md) — Explicit user approval protocol for Git commits
-- [`.agents/rules/db-migration-gate.md`](.agents/rules/db-migration-gate.md) — Conditional DBA sign-off on database schema updates
-
----
-
-## 🎨 4. UI/UX Design Intelligence Protocol (MANDATORY FOR NODE 2)
-
-Node 2 (🎨 UI/UX Designer) and all frontend builders MUST actively consult and synthesize our design intelligence stack before speccing or generating UI components:
-1. **`impeccable` (Paul Bakaus)**: Enforce the craft floor, eliminate generic AI tropes, and apply `/impeccable polish` & `/impeccable craft`.
-2. **`taste-skill` (Leonxlnx)**: Declare a **"Design Read"** (page kind, audience, vibe, aesthetic family) and practice anti-default restraint.
-3. **`emil-design-eng` & `animate` (Emil Kowalski)**: Spring physics, fluid entry/exit choreography, $44\text{px}+$ touch targets, and tactile button micro-feedback (`active:scale-95`).
-4. **`ui-ux-pro-max`**: Query 84 styles, 192 color palettes (OKLCH tokens), 74 font pairings, and 98 UX guidelines.
-5. **`huashu-design`**: 5-dimensional studio critique (Art Direction, Visual Hierarchy, Motion Continuity, Frontend Precision, Copywriting).
-
+## Co-working and release controls
+- Antigravity leads architecture, integration and browser verification; Codex handles assigned terminal tasks, focused edits, debugging and reviews. The user can change that assignment.
+- Check `git status --short` before editing. Preserve unrelated work. Assign one writer per file and record scope, branch, owned files, checks and remaining work when handing off between apps. Reuse existing handoff documents; they are context, not fresh authorization.
+- Follow shared global defaults and these project instructions. Read relevant referenced rules explicitly in Codex. Use available skills when relevant; report missing tools honestly rather than claiming a review or invocation.
+- Do not commit, push, merge, deploy, publish externally, run production migrations or execute destructive rollback commands without explicit user authorization for that action. Satisfy verification and schema-review gates first. Already granted authorization remains valid for its scope.
+- Keep secrets and personal data out of logs, screenshots, handoffs and external model prompts. Never weaken authorization or data isolation to make a test pass.
+- Report checks actually run, results and limitations. Do not invent package scripts or claim visual verification from a build alone.

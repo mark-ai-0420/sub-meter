@@ -11,6 +11,134 @@ import {
 const STORAGE_KEY = 'meralco_submeter_app_data_v1';
 const DATA_RESTORED_EVENT = 'submeter:data_restored';
 
+type CloudAppData = AppData & { cloudUpdatedAt?: number };
+export type CloudSyncStatus = 'idle' | 'syncing' | 'synced' | 'offline';
+let cloudStatus: CloudSyncStatus = 'idle';
+const cloudStatusListeners = new Set<(status: CloudSyncStatus) => void>();
+export const getCloudSyncStatus = () => cloudStatus;
+export const onCloudSyncStatus = (listener: (status: CloudSyncStatus) => void) => {
+  cloudStatusListeners.add(listener);
+  return () => { cloudStatusListeners.delete(listener); };
+};
+const setCloudStatus = (status: CloudSyncStatus) => {
+  cloudStatus = status;
+  cloudStatusListeners.forEach((listener) => listener(status));
+};
+let localRevision = 0;
+let latestLocalData: CloudAppData | undefined;
+let latestLocalTime = 0;
+let pushTimer: ReturnType<typeof setTimeout> | undefined;
+let cloudQueue: Promise<unknown> = Promise.resolve();
+let reconcilePromise: Promise<AppData | null> | undefined;
+const validCloudData = (value: unknown): value is CloudAppData => {
+  if (!value || typeof value !== 'object') return false;
+  const data = value as CloudAppData;
+  return Array.isArray(data.units) && Array.isArray(data.meters)
+    && Array.isArray(data.billingCycles) && !!data.landlordInfo
+    && (data.activeCycleId === null || typeof data.activeCycleId === 'string');
+};
+const isSampleData = (data: AppData) => {
+  // The UI computes summaries on mount; those derived values do not make sample data user data.
+  const comparable = (value: AppData) => JSON.stringify({
+    ...value, cloudUpdatedAt: undefined,
+    billingCycles: value.billingCycles.map((cycle) => ({ ...cycle, calculationSummary: undefined })),
+  });
+  return comparable(data) === comparable(initialAppData);
+};
+const cloudRequest = async (options?: RequestInit) => {
+  const response = await fetch('/api/storage', {
+    ...options, cache: 'no-store', signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error('Cloud storage unavailable');
+  return response.json();
+};
+
+export const fetchCloudAppData = async (): Promise<CloudAppData | null> => {
+  const result = await cloudRequest();
+  if (result.exists === false) return null;
+  if (result.exists !== true || !validCloudData(result.data)) throw new Error('Invalid cloud data');
+  return result.data;
+};
+
+export const pushCloudAppData = (data: AppData): Promise<boolean> => {
+  // Serialize writes so an earlier, slower request cannot finish after a newer save.
+  const snapshot = JSON.stringify(data);
+  const revision = localRevision;
+  const push = cloudQueue.then(async () => {
+    setCloudStatus('syncing');
+    try {
+      await cloudRequest({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: snapshot });
+      if (revision === localRevision) setCloudStatus('synced');
+      return true;
+    } catch {
+      setCloudStatus('offline');
+      return false;
+    }
+  });
+  cloudQueue = push;
+  return push;
+};
+
+const scheduleCloudPush = (data: AppData) => {
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => { void pushCloudAppData(data); }, 750);
+};
+
+/** Reconcile in the background; a local edit during GET always takes precedence. */
+export const syncAppDataWithCloud = (currentData?: AppData): Promise<AppData | null> => {
+  if (reconcilePromise) return reconcilePromise;
+  // Reconciliation decides which snapshot to send; do not let a pending older save race GET.
+  clearTimeout(pushTimer);
+  reconcilePromise = (async () => {
+    const revision = localRevision;
+    setCloudStatus('syncing');
+    try {
+      await cloudQueue;
+      const cloud = await fetchCloudAppData();
+      if (revision !== localRevision) return null;
+      let local = currentData as CloudAppData | undefined;
+      try {
+        const stored: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        if (validCloudData(stored)) local = stored;
+      } catch { /* LocalStorage unavailable: keep the caller's snapshot. */ }
+      // LocalStorage may have stripped photos to fit its quota; use the full saved snapshot.
+      if (latestLocalData && (!local || latestLocalData.cloudUpdatedAt === local.cloudUpdatedAt)) local = latestLocalData;
+      const sample = !local || isSampleData(local);
+      const localTime = local?.cloudUpdatedAt || 0;
+      const cloudTime = cloud?.cloudUpdatedAt || 0;
+      const localWins = local && !sample && (!cloud ||
+        (localTime || cloudTime ? localTime > cloudTime : local.billingCycles.length > cloud.billingCycles.length));
+      if (localWins && local) {
+        clearTimeout(pushTimer);
+        await pushCloudAppData(local);
+        return local;
+      }
+      if (cloud) {
+        // Persist and publish synchronously before awaiting IndexedDB so newer edits win.
+        if (JSON.stringify(local) !== JSON.stringify(cloud)) {
+          clearTimeout(pushTimer);
+          latestLocalData = cloud;
+          writeToLocalStorageSafely(cloud);
+          const persistence = saveAppDataToIndexedDB(cloud);
+          notifySyncListeners(cloud);
+          await persistence.catch(() => console.warn('[Storage] Cloud data IndexedDB backup failed'));
+        }
+      }
+      if (revision === localRevision) setCloudStatus(cloud ? 'synced' : 'idle');
+      return cloud || local || null;
+    } catch {
+      setCloudStatus('offline');
+      return null;
+    }
+  })().finally(() => { reconcilePromise = undefined; });
+  return reconcilePromise!;
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => { void syncAppDataWithCloud(); });
+  window.addEventListener('focus', () => { void syncAppDataWithCloud(); });
+}
+
 type SyncListener = (data: AppData) => void;
 const syncListeners: Set<SyncListener> = new Set();
 
@@ -92,6 +220,7 @@ export const loadAppData = (): AppData => {
     saveAppDataToIndexedDB(localData).catch((err) => {
       console.warn('[Storage] Background sync to IndexedDB failed:', err);
     });
+    void syncAppDataWithCloud(localData);
     return localData;
   }
 
@@ -105,9 +234,13 @@ export const loadAppData = (): AppData => {
  * Background task to check IndexedDB and restore state if LocalStorage was empty or corrupted.
  */
 const triggerBackgroundRestore = async (): Promise<void> => {
+  const revision = localRevision;
+  let restoredData = initialAppData;
   try {
     const idbData = await loadAppDataFromIndexedDB();
+    if (revision !== localRevision) return;
     if (idbData && idbData.units && idbData.meters && idbData.billingCycles) {
+      restoredData = idbData;
       console.info('[Storage] Restored valid AppData from IndexedDB into LocalStorage.');
       writeToLocalStorageSafely(idbData);
       notifySyncListeners(idbData);
@@ -120,6 +253,7 @@ const triggerBackgroundRestore = async (): Promise<void> => {
   } catch (err) {
     console.error('[Storage] Background restore from IndexedDB failed:', err);
   }
+  void syncAppDataWithCloud(restoredData);
 };
 
 /**
@@ -136,6 +270,7 @@ export const loadAppDataAsync = async (): Promise<AppData> => {
       if (parsed.units && parsed.meters && parsed.billingCycles) {
         // Sync to IndexedDB in background
         saveAppDataToIndexedDB(parsed).catch(console.warn);
+        void syncAppDataWithCloud(parsed);
         return parsed;
       }
     }
@@ -148,6 +283,7 @@ export const loadAppDataAsync = async (): Promise<AppData> => {
     const idbData = await loadAppDataFromIndexedDB();
     if (idbData && idbData.units && idbData.meters && idbData.billingCycles) {
       writeToLocalStorageSafely(idbData);
+      void syncAppDataWithCloud(idbData);
       return idbData;
     }
   } catch (err) {
@@ -157,6 +293,7 @@ export const loadAppDataAsync = async (): Promise<AppData> => {
   // Fallback to initialAppData
   writeToLocalStorageSafely(initialAppData);
   await saveAppDataToIndexedDB(initialAppData).catch(console.warn);
+  void syncAppDataWithCloud(initialAppData);
   return initialAppData;
 };
 
@@ -164,7 +301,15 @@ export const loadAppDataAsync = async (): Promise<AppData> => {
  * Saves AppData synchronously to LocalStorage and asynchronously to IndexedDB.
  */
 export const saveAppData = (data: AppData): void => {
+  const sample = isSampleData(data);
+  if (!sample) {
+    localRevision += 1;
+    latestLocalTime = Math.max(Date.now(), latestLocalTime + 1, ((data as CloudAppData).cloudUpdatedAt || 0) + 1);
+    data = { ...data, cloudUpdatedAt: latestLocalTime } as CloudAppData;
+  }
+  latestLocalData = data;
   writeToLocalStorageSafely(data);
+  if (!sample) scheduleCloudPush(data);
 
   // Asynchronous background persistence to IndexedDB
   saveAppDataToIndexedDB(data).catch((err) => {
@@ -189,7 +334,15 @@ export const saveAppData = (data: AppData): void => {
  * Asynchronously saves AppData and awaits both LocalStorage and IndexedDB completion.
  */
 export const saveAppDataAsync = async (data: AppData): Promise<void> => {
+  const sample = isSampleData(data);
+  if (!sample) {
+    localRevision += 1;
+    latestLocalTime = Math.max(Date.now(), latestLocalTime + 1, ((data as CloudAppData).cloudUpdatedAt || 0) + 1);
+    data = { ...data, cloudUpdatedAt: latestLocalTime } as CloudAppData;
+  }
+  latestLocalData = data;
   writeToLocalStorageSafely(data);
+  if (!sample) scheduleCloudPush(data);
   await saveAppDataToIndexedDB(data);
 };
 

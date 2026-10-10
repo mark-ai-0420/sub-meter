@@ -1,0 +1,10 @@
+# Upstash synchronization data/access audit
+
+- Scope: new Redis value `submeter:app_data`; no IndexedDB schema/version change, SQL migration, or production write performed during verification.
+- Compatibility: existing AppData fields remain intact. Optional `cloudUpdatedAt` snapshot metadata is stored/exported with AppData. Legacy snapshots reconcile by cycle count; timestamped snapshots reconcile by modification time so equal-count edits and deletions can propagate.
+- Isolation/access: the approved API uses a single shared key, anonymous GET/POST, and wildcard CORS. All callers can read or overwrite the same account, including tenant/contact/billing data. CORS is not authentication. **FAIL for public multi-user release**; Antigravity must resolve the access model before deployment. Credentials remain server-side and are not returned or logged.
+- Concurrency: writes from one browser are serialized and debounced. Startup reconciliation rejects a cloud response if a local edit occurred while it was fetching. Cross-device concurrent writes remain last-writer-wins; there is no Redis compare-and-set, per-user namespace, or conflict merge. Device clock skew can affect timestamp ordering.
+- Validation: malformed JSON, unsupported methods, missing credentials, invalid top-level structures, and unavailable Redis return explicit non-success responses. Client failures preserve offline local state.
+- Recovery: local IndexedDB/LocalStorage remain available and development requests also write an ignored local JSON backup. No automatic clearing, production migration, or destructive rollback is included. JSON export remains the user recovery mechanism.
+- Evidence: disposable mocked boundary tests; no live credentialed Redis check or Vercel deployment. Independent review pending.
+- Release status: blocked on dependency installation/build verification, independent review, browser acceptance, and access-model review. This report is implementation evidence, not independent DBA sign-off.

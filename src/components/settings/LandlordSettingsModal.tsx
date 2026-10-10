@@ -26,6 +26,9 @@ import {
   getStorageHealth,
   requestPersistentStorage,
   StorageHealthInfo,
+  getCloudSyncStatus,
+  onCloudSyncStatus,
+  syncAppDataWithCloud,
 } from '../../services/storage';
 import { PresetTemplatesModal } from './PresetTemplatesModal';
 
@@ -56,6 +59,8 @@ export const LandlordSettingsModal: React.FC<LandlordSettingsModalProps> = ({
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced'>('idle');
+  const [cloudStatus, setCloudStatus] = useState(getCloudSyncStatus);
+  useEffect(() => onCloudSyncStatus(setCloudStatus), []);
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
 
   const [storageHealth, setStorageHealth] = useState<StorageHealthInfo | null>(null);
@@ -332,6 +337,20 @@ export const LandlordSettingsModal: React.FC<LandlordSettingsModalProps> = ({
               <p className="text-slate-500 text-[11px]">
                 Your data is stored in your browser's offline storage engine. You can export a JSON backup to transfer your setup to other devices or family members.
               </p>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div>
+                  <h5 className="font-bold text-slate-900">Cloud Sync</h5>
+                  <span role="status" aria-live="polite" className={`inline-flex mt-1 px-2.5 py-1 rounded-full font-semibold ${cloudStatus === 'synced' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                    {cloudStatus === 'synced' ? 'Synced' : cloudStatus === 'syncing' ? 'Syncing…' : cloudStatus === 'offline' ? 'Cloud unavailable · Saved locally' : 'Not synced yet'}
+                  </span>
+                </div>
+                <button type="button" disabled={cloudStatus === 'syncing'} onClick={() => { void syncAppDataWithCloud(appData); }}
+                  className="min-h-[44px] inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-xl font-semibold disabled:opacity-60 hover:bg-slate-100">
+                  <RefreshCw className={`w-4 h-4 ${cloudStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                  Sync Now
+                </button>
+              </div>
 
               {/* Storage Health & iOS Persistence Card */}
               <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-3.5 shadow-sm">

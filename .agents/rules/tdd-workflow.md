@@ -1,29 +1,12 @@
-# Mandatory TDD & Subagent Verification Workflow
+---
+trigger: always_on
+---
+# Engineering verification and collaboration
 
-Every engineering task must follow the systematic Quality-Driven process:
-
-```mermaid
-graph TD
-    A[Task Ingestion & Plan] --> B[Subagent Fan-Out: Parallel Builders with File-Lock]
-    B --> C[Unified Build: pnpm run build]
-    C --> D[Primary Thread Critic: Automated Tests & Visual Audit]
-    D -->|FAIL| B
-    D -->|PASS| E[Walkthrough & Report Artifacts]
-    E --> F[Conditional DBA Gate + Prompt User for Git Approval]
-```
-
-## 1. Subagent Fan-Out with File-Lock Protocol
-- Decompose complex features across specialized builder subagents (`Model: 'flash'`).
-- **File-Lock Guarantee**: Every builder subagent receives explicit, disjoint file paths. No two subagents may edit the same file simultaneously.
-- If overlap is unavoidable, assign one subagent as primary owner; secondary subagents return instructions to the orchestrator for sequential merge.
-
-## 2. Independent Builder Verification
-- Each builder must run localized build and syntax checks before sending its completion report.
-
-## 3. High-Reasoning QA Critic (Primary Thread)
-- Primary thread consolidates builder outputs, runs unified compilation (`pnpm run build`), executes automated E2E browser scripts, and captures high-resolution screenshots.
-- Issues a formal `PASS` / `FAIL` verdict before presenting work to the user.
-
-## 4. Visual Proof & Walkthrough
-- Save high-resolution verification screenshots to the artifact directory.
-- Present responsive screenshot carousels and structured Pass/Fail tables in `walkthrough.md`.
+For substantial multi-file features, prepare a product brief, design specification when relevant, and an implementation plan using existing `handoffs/<feature>/` conventions. Focused fixes can use a short plan. Antigravity coordinates product/design and integration; Codex can implement or review explicitly assigned files.
+Delegate independent work when supported and useful; assign disjoint file ownership and never imply a model or slash command is available when it is not. Focused Codex tasks can execute directly. If a required independent review is unavailable, report that limitation before release.
+Use tests for changed behavior where suitable, run the project checks listed in AGENTS.md, and verify affected existing journeys. Builders run focused checks; run shared build output generation sequentially after integration rather than competing over the same generated artifacts.
+For UI work, verify affected desktop/mobile behavior and save synthetic-data screenshots when browser access is available. Present a concise walkthrough with PASS/FAIL/NOT RUN results. Build success alone does not prove interaction correctness.
+For schema changes complete database review before release. Inspect staged, unstaged and untracked changes; do not apply production migrations just because SQL was edited.
+After failed checks, fix the root cause and rerun relevant checks. After two unsuccessful rework iterations for the same defect, explain the blocker and escalate rather than claiming success or endlessly retrying.
+For major releases, review functional, visual, performance and authorization risks; use independent reviewers when available. On a post-release regression, diagnose and prepare a rollback proposal. Obtain explicit authorization before revert, push, migration rollback or external announcements.
