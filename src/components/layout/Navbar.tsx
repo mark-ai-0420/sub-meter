@@ -11,6 +11,7 @@ import {
   PlusSquare,
   X,
   CheckCircle,
+  ChevronDown,
 } from 'lucide-react';
 import { AppData } from '../../types';
 import { formatDate } from '../../utils/formatters';
@@ -106,6 +107,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </option>
                     ))}
                   </select>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 </div>
               )}
 
@@ -144,6 +146,32 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Mobile & Tablet Active Cycle Selector Bar (< lg) */}
+        {appData.billingCycles.length > 0 && (
+          <div className="lg:hidden border-t border-slate-800/80 px-3 sm:px-6 py-2 bg-slate-950/70 backdrop-blur-sm">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 shrink-0">
+                <Calendar className="w-3.5 h-3.5 text-orange-400" />
+                <span className="font-semibold text-[11px] text-slate-300">Active Month:</span>
+              </div>
+              <div className="relative flex-1 max-w-sm">
+                <select
+                  value={appData.activeCycleId || ''}
+                  onChange={(e) => onSelectCycle(e.target.value)}
+                  className="w-full pl-3 pr-8 py-1.5 bg-slate-800 text-slate-100 border border-slate-700 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-orange-500 focus:outline-none appearance-none cursor-pointer"
+                >
+                  {appData.billingCycles.map((cycle) => (
+                    <option key={cycle.id} value={cycle.id}>
+                      {cycle.name} ({formatDate(cycle.mainBill.periodTo)})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* iOS Installation Instructions Modal */}

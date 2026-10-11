@@ -107,7 +107,8 @@ export const syncAppDataWithCloud = (currentData?: AppData): Promise<AppData | n
       const localTime = local?.cloudUpdatedAt || 0;
       const cloudTime = cloud?.cloudUpdatedAt || 0;
       const localWins = local && !sample && (!cloud ||
-        (localTime || cloudTime ? localTime > cloudTime : local.billingCycles.length > cloud.billingCycles.length));
+        local.billingCycles.length > cloud.billingCycles.length ||
+        (localTime || cloudTime ? localTime > cloudTime : local.billingCycles.length >= cloud.billingCycles.length));
       if (localWins && local) {
         clearTimeout(pushTimer);
         await pushCloudAppData(local);
